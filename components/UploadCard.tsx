@@ -21,7 +21,9 @@ export function UploadCard({
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-      const img = new Image();
+      // Resize + convert to JPEG for mobile compatibility (e.g. large HEIC/PNG
+      // camera photos) before sending to the AI.
+      const img = new window.Image();
       img.onload = () => {
         const MAX = 1280;
         let { width, height } = img;
@@ -33,7 +35,12 @@ export function UploadCard({
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
-        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          onImage(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
         onImage(canvas.toDataURL("image/jpeg", 0.8));
       };
       img.onerror = () => onImage(dataUrl);

@@ -12,6 +12,16 @@ Use these calming, warm colors:
 
 Feel free to adjust slight variations if needed, but maintain this warm + cool + natural aesthetic.
 
+### FRESHNESS STATUS COLORS (v2)
+
+Soft, non-alarming dots for expiry status (see `user_scenario_v2.md`):
+
+- 🟢 Fresh (>3 days left): #6FAE6E (muted green)
+- 🟡 Expiring soon (≤3 days): #E0A458 (warm amber)
+- 🔴 Expired (≤0 days): #D98C8C (soft rose, not harsh red)
+
+Home alert banner uses the amber family on a light amber glass background.
+
 ### DESIGN STYLE
 
 - **Overall Tone**: Calm, minimalist, welcoming

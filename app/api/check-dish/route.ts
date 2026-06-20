@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeDish, usingMockAI } from "@/lib/gemini";
+import { analyzeDish, usingMockAI, describeAiError } from "@/lib/gemini";
 import { getStore } from "@/lib/store";
 import { parseDataUrl } from "@/lib/image";
 import type { Ingredient } from "@/lib/types";
@@ -44,7 +44,10 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("check-dish error:", err);
     return NextResponse.json(
-      { error: "Could not analyze the dish. Please try another photo." },
+      {
+        error: `Could not analyze the dish. ${describeAiError(err)}`,
+        reason: describeAiError(err),
+      },
       { status: 500 },
     );
   }

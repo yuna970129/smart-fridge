@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
+import { withFreshness } from "@/lib/freshness";
 import type { IngredientStatus, ScannedItem } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-// GET /api/fridge?status=have|gone|all — list ingredients.
+// GET /api/fridge?status=have|gone|all — list ingredients with freshness.
 export async function GET(req: NextRequest) {
   try {
     const status =
@@ -12,7 +13,8 @@ export async function GET(req: NextRequest) {
         | IngredientStatus
         | "all"
         | null) ?? "have";
-    const ingredients = await getStore().list(status ?? "have");
+    const rows = await getStore().list(status ?? "have");
+    const ingredients = rows.map((i) => withFreshness(i));
     return NextResponse.json({ ingredients });
   } catch (err) {
     console.error("fridge GET error:", err);

@@ -11,7 +11,17 @@
 >   (`.data/fridge.json`), Gemini 미설정 시 결정론적 Mock AI로 폴백.
 > - 영수증 스캔은 **저장하지 않고 인식만** 반환한다. 저장은 사용자가
 >   "Confirm & Save" 시 `POST /api/fridge`로 수행(시나리오 일치).
-> - 모델 기본값은 `gemini-2.0-flash` (`GEMINI_MODEL`로 변경 가능).
+> - 모델 기본값은 `gemini-2.5-flash` (`GEMINI_MODEL`로 변경 가능, 예: `gemini-3.5-flash`).
+>   일시적 503/과부하(특히 gemini-3.5-flash vision)는 백오프 재시도로 자동 흡수.
+>
+> 🆕 **v2 (유통기한/신선도 추적)** — `user_scenario_v2.md` 기준
+> - 저장 시 카테고리 평균(`lib/shelflife.ts`)으로 **유통기한 자동 계산**:
+>   `expires_at = added_at + shelf_life_days`.
+> - 신선도는 저장하지 않고 **조회 시 today 기준 동적 계산**(`lib/freshness.ts`):
+>   🟢 fresh(>3d) / 🟡 expiring(≤3d) / 🔴 expired(≤0d).
+> - **Home 경고 배너**: 주의 필요(🟡+🔴) 개수 표시 → `/fridge?filter=expiring` 링크.
+> - **My Fridge**: 상태 점 + 남은 일수 + `All/Fresh/Expiring` 필터, 임박 순 정렬.
+> - 데모 시드는 세 가지 색이 모두 보이도록 `expires_at`을 직접 지정.
 
 ---
 
@@ -29,20 +39,21 @@
 
 ```
 app/
-  page.tsx                     # Home
-  scan-receipt/page.tsx        # 업로드→로딩→결과→저장
+  page.tsx                     # Home (+ 유통기한 경고 배너)
+  scan-receipt/page.tsx        # 업로드→로딩→결과(Avg Xd)→저장
   check-dish/page.tsx          # 업로드→로딩→체크리스트→확정
-  fridge/page.tsx              # 재고 목록 + 삭제
+  fridge/page.tsx              # 재고 목록 (🟢🟡🔴 + 필터) + 삭제
   globals.css                  # 팔레트 + 글래스모피즘
   api/
     scan-receipt/route.ts
     check-dish/route.ts
     fridge/route.ts            # GET / POST / PATCH / DELETE
     seed/route.ts              # POST(reset+seed) / DELETE(clear)
-components/                    # 재사용 UI (Button, UploadCard, ...)
+components/                    # 재사용 UI (Button, UploadCard, FreshnessDot, ...)
 lib/
   config.ts  store.ts  gemini.ts  supabase.ts
   emoji.ts   image.ts  api.ts     types.ts
+  shelflife.ts  freshness.ts       # v2: 카테고리 평균 + 신선도 계산
 ```
 
 ---
@@ -68,7 +79,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key   # 서버 쓰기용(권장)
 
 # Gemini (선택)
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash   # 또는 gemini-3.5-flash
 
 # App (선택)
 DEMO_USER_ID=demo-user
@@ -88,11 +99,21 @@ CREATE TABLE ingredients (
   name TEXT NOT NULL,
   emoji TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('have', 'gone')),
+  shelf_life_days INT NOT NULL DEFAULT 14,   -- v2: 카테고리 평균
+  expires_at DATE,                           -- v2: added_at + shelf_life_days
   created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX idx_user_status ON ingredients(user_id, status);
+CREATE INDEX idx_user_expires ON ingredients(user_id, expires_at);
 ```
+
+> 기존 v1 테이블이 있다면 컬럼만 추가:
+> ```sql
+> ALTER TABLE ingredients ADD COLUMN shelf_life_days INT NOT NULL DEFAULT 14;
+> ALTER TABLE ingredients ADD COLUMN expires_at DATE;
+> ```
+> (신선도 🟢🟡🔴 는 `expires_at` 기준으로 앱이 동적 계산하므로 컬럼 불필요)
 
 ---
 

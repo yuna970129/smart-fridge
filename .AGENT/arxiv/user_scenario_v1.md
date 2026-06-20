@@ -1,9 +1,8 @@
 # 🧊 Fridge AI | User Scenario
 
-**Language**: English
-**Platform**: Web
-**Quantity Tracking**: Yes/No only (no numbers)
-**Freshness Tracking**: Auto-calculated based on food category
+**Language**: English  
+**Platform**: Web  
+**Quantity Tracking**: Yes/No only (no numbers)  
 
 ---
 
@@ -15,8 +14,6 @@
 │                             │
 │      🧊 Fridge AI          │
 │                             │
-│  ⚠️ ALERT: 2 items expiring! │  ← Urgent Expiring Banner
-|                            │
 │  ┌─────────────────────┐   │
 │  │  📸 Scan Receipt    │   │
 │  └─────────────────────┘   │
@@ -36,11 +33,6 @@
 - Click "📸 Scan Receipt"
 - Click "🍽️ Check Dish"
 - Click "📋 My Fridge"
-
-**Urgent Expiring Banner:**
-- Highlights items with 🔴 Red (Expired) or 🟡 Yellow (Expiring soon) status.
-- Shows a live count of items that need attention.
-- Hidden when no items are expiring.
 
 ---
 
@@ -93,13 +85,13 @@
 │                             │
 │  Found in Receipt:          │
 │                             │
-│  ✓ 🥚 Eggs (Avg 30d)       │
-│  ✓ 🥕 Carrot (Avg 14d)     │
-│  ✓ 🍜 Ramen (Avg 180d)     │
-│  ✓ 🧄 Garlic (Avg 60d)     │
-│  ✓ 🧈 Butter (Avg 90d)     │
-│  ✓ 🥬 Kimchi (Avg 30d)     │
-│  ✓ 🧅 Green Onion (Avg 7d) │
+│  ✓ 🥚 Eggs                 │
+│  ✓ 🥕 Carrot               │
+│  ✓ 🍜 Ramen                │
+│  ✓ 🧄 Garlic               │
+│  ✓ 🧈 Butter               │
+│  ✓ 🥬 Kimchi               │
+│  ✓ 🧅 Green Onion          │
 │                             │
 │  [Confirm & Save]           │
 │  [Upload Again]             │
@@ -110,15 +102,13 @@
 **What User Sees:**
 - AI-recognized ingredient list
 - Each item with emoji (no quantity numbers)
-- **Automatically assigned expiration window** based on general category averages (e.g., Eggs: 30 days)
 
 **User Action:**
 - Click "Confirm & Save" → Ingredients added to fridge
 - Click "Upload Again" → Upload different receipt
 
 **What Happens:**
-- All ingredients added to "My Fridge" (status: 🟢 Fresh)
-- Each ingredient's `expires_at` = Date of Scan + Category Average
+- All ingredients added to "My Fridge" (status: "Have")
 
 ---
 
@@ -199,8 +189,8 @@
 
 **User Action:**
 For each ingredient, click ONE button:
-- "Still have" → Keep in fridge (status remains its current freshness)
-- "Used all" → Remove from fridge (item is gone)
+- "Still have" → Keep in fridge (status remains "Have")
+- "Used all" → Remove from fridge (status becomes "Gone")
 
 **Example Flow:**
 ```
@@ -215,7 +205,6 @@ For each ingredient, click ONE button:
 ```
 
 **After User Clicks "Confirm":**
-- **Automatic Sync:** Every "Used all" item is immediately removed from the inventory
 - Changes saved to fridge inventory
 - User returns to home screen
 
@@ -228,46 +217,33 @@ For each ingredient, click ONE button:
 **Current Fridge Inventory:**
 
 ```
-┌───────────────────────────────────┐
-│   📋 My Fridge                    │
-│  [Filter: All / Fresh / Expiring] │
-│                                   │
-│  🟢 🥚 Eggs (28d left)            │
-│      [🗑️ Delete]                  │
-│                                   │
-│  🟡 🥕 Carrot (2d left)           │
-│      [🗑️ Delete]                  │
-│                                   │
-│  🔴 🥓 Ham (Expired!)             │
-│      [🗑️ Delete]                  │
-│                                   │
-│  🟢 🍜 Ramen (175d left)          │
-│      [🗑️ Delete]                  │
-│                                   │
-│  🟢 🧈 Butter (85d left)          │
-│      [🗑️ Delete]                  │
-│                                   │
-│  ← Back to Home                   │
-│                                   │
-└───────────────────────────────────┘
+┌─────────────────────────────┐
+│                             │
+│   📋 My Fridge              │
+│                             │
+│  🥚 Eggs                    │
+│      [🗑️ Delete]            │
+│                             │
+│  🥕 Carrot                  │
+│      [🗑️ Delete]            │
+│                             │
+│  🍜 Ramen                   │
+│      [🗑️ Delete]            │
+│                             │
+│  🧈 Butter                  │
+│      [🗑️ Delete]            │
+│                             │
+│  🥬 Kimchi                  │
+│      [🗑️ Delete]            │
+│                             │
+│  ← Back to Home             │
+│                             │
+└─────────────────────────────┘
 ```
 
 **What User Sees:**
-- All ingredients in fridge (status icon + emoji + name + days left)
+- All ingredients in fridge (emoji + name only)
 - Delete button next to each ingredient
-- Filter bar to sort by freshness/status
-
-**Status Icons (Auto-calculated):**
-- 🟢 **Green — Fresh:** 4+ days left
-- 🟡 **Yellow — Expiring soon:** ≤ 3 days left
-- 🔴 **Red — Expired:** 0 days left (past `expires_at`)
-
-**Auto-Expiry Logic:**
-- Expiration date is calculated as `Date of Scan + Category Average`.
-- Status icon updates automatically each day.
-
-**Filtering:**
-- Users can sort/filter by expiration date or status (All / Fresh / Expiring).
 
 **User Action:**
 - Click "🗑️" button next to any ingredient
@@ -295,14 +271,14 @@ Result: Carrot disappears from list
 ```
 1. Home Screen → Click "📸 Scan Receipt"
 2. Upload receipt photo
-3. AI analyzes → Shows ingredients + auto expiry date:
-   🥚 Eggs (Avg 30d)
-   🥕 Carrot (Avg 14d)
-   🍜 Ramen (Avg 180d)
-   🧄 Garlic (Avg 60d)
-   🧈 Butter (Avg 90d)
+3. AI analyzes → Shows:
+   🥚 Eggs
+   🥕 Carrot
+   🍜 Ramen
+   🧄 Garlic
+   🧈 Butter
 4. Click "Confirm & Save"
-5. All ingredients added to fridge with status 🟢 Fresh
+5. All ingredients added to fridge
 ```
 
 ### Day 2: Cooked a Dish
@@ -319,25 +295,24 @@ Result: Carrot disappears from list
    - Garlic: "Still have" ✓
    - Green Onion: "Used all" ✓
 5. Click "Confirm"
-6. Kimchi & Green Onion auto-removed from fridge
+6. Kimchi & Green Onion removed from fridge
    Garlic stays in fridge
 ```
 
 ### Day 3: Fridge Management
 
 ```
-1. Home Screen → See "⚠️ ALERT: 1 item expiring!" in the banner
-2. Click "📋 My Fridge"
-3. Current fridge shows:
-   🟢 🥚 Eggs (28d left)
-   🟡 🥕 Carrot (2d left)   ← Expiring soon!
-   🟢 🍜 Ramen (175d left)
-   🟢 🧈 Butter (85d left)
-   🟢 🧄 Garlic (58d left)
-4. Carrot went bad → Click "🗑️" next to Carrot
-5. Confirm "Delete Carrot from fridge?"
-6. Click "Yes"
-7. Carrot removed from fridge
+1. Home Screen → Click "📋 My Fridge"
+2. Current fridge shows:
+   🥚 Eggs
+   🥕 Carrot
+   🍜 Ramen
+   🧈 Butter
+   🧄 Garlic
+3. Carrot went bad → Click "🗑️" next to Carrot
+4. Confirm "Delete Carrot from fridge?"
+5. Click "Yes"
+6. Carrot removed from fridge
 ```
 
 ---
@@ -346,12 +321,12 @@ Result: Carrot disappears from list
 
 | Feature | Required? | Description |
 |---------|-----------|-------------|
-| **Home Screen** | ✅ | 3 buttons + Urgent Expiring Alert Banner |
-| **Scan Receipt** | ✅ | Upload → AI analyze → Auto-set expiry date → Save to database |
-| **Check Dish** | ✅ | Upload → AI analyze → Toggle consumption → Auto-sync inventory |
-| **My Fridge** | ✅ | Display freshness (🟢🟡🔴) + days left + Sort/Filter + Delete |
-| **Database** | ✅ | Store ingredients + expiry dates (Yes/No status) |
-| **AI (LLM)** | ✅ | Recognize receipt text, identify dish & ingredients, assign category dates |
+| **Home Screen** | ✅ | 3 buttons (Scan Receipt, Check Dish, My Fridge) |
+| **Scan Receipt** | ✅ | Upload → AI analyze → Show list → Save to database |
+| **Check Dish** | ✅ | Upload → AI analyze → Show checklist → Update database |
+| **My Fridge** | ✅ | Display all ingredients → Delete function |
+| **Database** | ✅ | Store ingredients (Yes/No status only) |
+| **AI (LLM)** | ✅ | Recognize receipt text, identify dish & ingredients used |
 | **Web Interface** | ✅ | Simple HTML/React buttons & screens |
 | **Photo Capture** | ❌ | File upload only (for demo) |
 | **Quantity Tracking** | ❌ | Not needed (yes/no only) |
@@ -361,38 +336,23 @@ Result: Carrot disappears from list
 
 ---
 
-## 💾 Data Model
+## 💾 Data Model (Simple)
 
 **Fridge Ingredients:**
-```json
+```
 [
-  {
-    "emoji": "🥚",
-    "name": "Eggs",
-    "added_at": "2026-06-20",
-    "expires_at": "2026-07-20",
-    "status": "Fresh"
-  },
-  {
-    "emoji": "🥕",
-    "name": "Carrot",
-    "added_at": "2026-06-20",
-    "expires_at": "2026-07-04",
-    "status": "Fresh"
-  }
+  { emoji: "🥚", name: "Eggs", status: "Have" },
+  { emoji: "🥕", name: "Carrot", status: "Have" },
+  { emoji: "🍜", name: "Ramen", status: "Have" },
+  { emoji: "🧄", name: "Garlic", status: "Have" },
+  { emoji: "🧈", name: "Butter", status: "Gone" },
+  { emoji: "🥬", name: "Kimchi", status: "Gone" }
 ]
 ```
 
-- `added_at`: Date the ingredient was scanned/saved.
-- `expires_at`: Added automatically (`added_at` + category average, e.g. Eggs = 30 days).
-- `status`: Derived from `expires_at` vs. today.
-
-**Status Logic (auto-calculated):**
-- 🟢 **Fresh:** `expires_at − today > 3 days`
-- 🟡 **Expiring soon:** `expires_at − today ≤ 3 days`
-- 🔴 **Expired:** `expires_at − today ≤ 0 days`
-
-When an ingredient is consumed via "Check Dish → Used all" or deleted in "My Fridge", it is removed from the list entirely.
+**Status Values:**
+- "Have" = Ingredient exists in fridge
+- "Gone" = Ingredient removed from fridge
 
 ---
 

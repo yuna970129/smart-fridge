@@ -17,7 +17,7 @@ function clean(value: string | undefined): string | undefined {
 }
 
 export const DEMO_USER = clean(process.env.DEMO_USER_ID) ?? "demo-user";
-export const GEMINI_MODEL = clean(process.env.GEMINI_MODEL) ?? "gemini-2.0-flash";
+export const GEMINI_MODEL = clean(process.env.GEMINI_MODEL) ?? "gemini-2.5-flash";
 
 export const supabaseUrl = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 export const supabaseAnonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);

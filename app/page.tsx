@@ -1,4 +1,8 @@
 import Link from "next/link";
+import { getStore } from "@/lib/store";
+import { withFreshness } from "@/lib/freshness";
+
+export const dynamic = "force-dynamic";
 
 const actions = [
   {
@@ -21,16 +25,41 @@ const actions = [
   },
 ];
 
-export default function Home() {
+async function getAttentionCount(): Promise<number> {
+  try {
+    const items = await getStore().list("have");
+    return items
+      .map((i) => withFreshness(i))
+      .filter((i) => i.freshness !== "fresh").length;
+  } catch {
+    return 0;
+  }
+}
+
+export default async function Home() {
+  const attention = await getAttentionCount();
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
-      <div className="animate-fade-up mb-10 text-center">
+      <div className="animate-fade-up mb-6 text-center">
         <div className="mb-3 text-6xl">🧊</div>
         <h1 className="text-3xl font-semibold tracking-tight text-ink">
           Fridge AI
         </h1>
         <p className="mt-2 text-ink-soft">Your smart kitchen companion</p>
       </div>
+
+      {attention > 0 && (
+        <Link
+          href="/fridge?filter=expiring"
+          className="animate-fade-up mb-6 flex items-center gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 shadow-soft backdrop-blur-sm transition duration-300 hover:bg-amber-100/80"
+        >
+          <span className="text-xl">⚠️</span>
+          <span className="text-[15px] font-semibold text-amber-700">
+            ALERT: {attention} item{attention === 1 ? "" : "s"} expiring!
+          </span>
+        </Link>
+      )}
 
       <nav className="flex flex-col gap-4">
         {actions.map((a) => (

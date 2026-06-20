@@ -11,7 +11,12 @@ import { CheckIcon, SparkleIcon } from "@/components/icons";
 import { addToFridge, scanReceipt } from "@/lib/api";
 
 type Step = "upload" | "loading" | "results" | "saved";
-type Row = { name: string; emoji: string; checked: boolean };
+type Row = {
+  name: string;
+  emoji: string;
+  shelf_life_days?: number;
+  checked: boolean;
+};
 
 export default function ScanReceiptPage() {
   const [step, setStep] = useState<Step>("upload");
@@ -48,7 +53,13 @@ export default function ScanReceiptPage() {
     setStep("loading");
     try {
       const selected = rows.filter((r) => r.checked);
-      await addToFridge(selected.map(({ name, emoji }) => ({ name, emoji })));
+      await addToFridge(
+        selected.map(({ name, emoji, shelf_life_days }) => ({
+          name,
+          emoji,
+          shelf_life_days,
+        })),
+      );
       setSavedCount(selected.length);
       setStep("saved");
     } catch (e) {
@@ -127,6 +138,11 @@ export default function ScanReceiptPage() {
                   <span className="text-2xl leading-none">{row.emoji}</span>
                   <span className="flex-1 text-[17px] font-medium text-ink">
                     {row.name}
+                    {row.shelf_life_days != null && (
+                      <span className="ml-1.5 text-[14px] font-normal text-ink-soft">
+                        (Avg {row.shelf_life_days}d)
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>

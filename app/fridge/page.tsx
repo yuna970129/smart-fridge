@@ -1,22 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Screen } from "@/components/Screen";
 import { Button } from "@/components/Button";
 import { Spinner } from "@/components/Spinner";
 import { IngredientRow } from "@/components/IngredientRow";
+import { FreshnessDot } from "@/components/FreshnessDot";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { TrashIcon } from "@/components/icons";
 import { deleteIngredient, getFridge, seedFridge } from "@/lib/api";
-import type { Ingredient } from "@/lib/types";
+import { freshnessLabel, type FreshIngredient } from "@/lib/freshness";
+import { cn } from "@/lib/cn";
+
+type Filter = "all" | "fresh" | "expiring";
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "fresh", label: "Fresh" },
+  { key: "expiring", label: "Expiring" },
+];
+
+function initialFilter(): Filter {
+  if (typeof window === "undefined") return "all";
+  const f = new URLSearchParams(window.location.search).get("filter");
+  return f === "fresh" || f === "expiring" ? f : "all";
+}
 
 export default function FridgePage() {
-  const [items, setItems] = useState<Ingredient[]>([]);
+  const [items, setItems] = useState<FreshIngredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [target, setTarget] = useState<Ingredient | null>(null);
+  const [target, setTarget] = useState<FreshIngredient | null>(null);
   const [busy, setBusy] = useState(false);
+  const [filter, setFilter] = useState<Filter>(initialFilter);
 
   useEffect(() => {
     let active = true;
@@ -37,6 +54,13 @@ export default function FridgePage() {
       active = false;
     };
   }, []);
+
+  const visible = useMemo(() => {
+    if (filter === "fresh") return items.filter((i) => i.freshness === "fresh");
+    if (filter === "expiring")
+      return items.filter((i) => i.freshness !== "fresh");
+    return items;
+  }, [items, filter]);
 
   async function confirmDelete() {
     if (!target) return;
@@ -106,26 +130,65 @@ export default function FridgePage() {
           </div>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2.5">
-          {items.map((item) => (
-            <li key={item.id}>
-              <IngredientRow
-                emoji={item.emoji}
-                name={item.name}
-                trailing={
-                  <button
-                    type="button"
-                    aria-label={`Delete ${item.name}`}
-                    onClick={() => setTarget(item)}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-soft transition duration-300 hover:bg-rose-50 hover:text-rose-600"
-                  >
-                    <TrashIcon />
-                  </button>
-                }
-              />
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="mb-4 flex gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  "rounded-full px-4 py-1.5 text-sm font-medium transition duration-300",
+                  filter === f.key
+                    ? "bg-gold text-ink shadow-soft"
+                    : "bg-white/55 text-ink-soft hover:bg-white/80",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {visible.length === 0 ? (
+            <p className="rounded-2xl bg-teal/60 px-4 py-6 text-center text-ink-soft shadow-soft">
+              No {filter} items.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
+              {visible.map((item) => (
+                <li key={item.id}>
+                  <IngredientRow
+                    emoji={item.emoji}
+                    name={item.name}
+                    leading={<FreshnessDot level={item.freshness} />}
+                    subtitle={
+                      <span
+                        className={cn(
+                          item.freshness === "expired" && "text-rose-600",
+                          item.freshness === "expiring" && "text-amber-600",
+                        )}
+                      >
+                        {item.freshness === "expired"
+                          ? "Expired!"
+                          : freshnessLabel(item.days_left)}
+                      </span>
+                    }
+                    trailing={
+                      <button
+                        type="button"
+                        aria-label={`Delete ${item.name}`}
+                        onClick={() => setTarget(item)}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-soft transition duration-300 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <TrashIcon />
+                      </button>
+                    }
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       <ConfirmDialog

@@ -1,7 +1,7 @@
 # 🧊 Fridge AI
 
 Scan a grocery receipt to stock your fridge, snap a photo of a cooked dish to
-mark ingredients as used up, and manage everything in one calm, glassy UI.
+mark ingredients as used up, and track freshness — all in one calm, glassy UI.
 
 Built as a single **Next.js (App Router)** app that holds **both the frontend
 and the backend** in this one repo.
@@ -10,6 +10,7 @@ and the backend** in this one repo.
 - **Backend** — API routes in `app/api/` + domain logic in `lib/`
 - **AI** — Google Gemini (vision) for receipt & dish analysis
 - **Storage** — Supabase (Postgres); falls back to a local JSON file for demos
+- **Freshness (v2)** — auto-assigned expiry dates + 🟢🟡🔴 status & alerts
 
 > Runs instantly with **no API keys** — storage uses a local JSON file and the
 > AI uses a built-in mock provider. Add keys to go live.
@@ -93,11 +94,17 @@ CREATE TABLE ingredients (
   name TEXT NOT NULL,
   emoji TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('have', 'gone')),
+  shelf_life_days INT NOT NULL DEFAULT 14,
+  expires_at DATE,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX idx_user_status ON ingredients(user_id, status);
+CREATE INDEX idx_user_expires ON ingredients(user_id, expires_at);
 ```
+
+Freshness (🟢🟡🔴) is derived from `expires_at` at read time, so no extra column
+is needed for status.
 
 Then set `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (or the anon
 key) in `.env.local`. With no Supabase config, data is stored in

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeReceipt, usingMockAI } from "@/lib/gemini";
+import { analyzeReceipt, usingMockAI, describeAiError } from "@/lib/gemini";
 import { parseDataUrl } from "@/lib/image";
 
 export const runtime = "nodejs";
@@ -18,7 +18,10 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("scan-receipt error:", err);
     return NextResponse.json(
-      { error: "Could not read the receipt. Please try another photo." },
+      {
+        error: `Could not read the receipt. ${describeAiError(err)}`,
+        reason: describeAiError(err),
+      },
       { status: 500 },
     );
   }
