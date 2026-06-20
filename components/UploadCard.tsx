@@ -19,7 +19,26 @@ export function UploadCard({
   function readFile(file?: File | null) {
     if (!file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
-    reader.onload = () => onImage(reader.result as string);
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1280;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          const scale = MAX / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        onImage(canvas.toDataURL("image/jpeg", 0.8));
+      };
+      img.onerror = () => onImage(dataUrl);
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   }
 
