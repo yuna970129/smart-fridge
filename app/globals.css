@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* ---- Fridge AI palette (from .AGENT/design.md) ---- */
+@theme {
+  --color-gold: #e8c47e;
+  --color-gold-deep: #d9ae5f;
+  --color-sage: #b6c3a2;
+  --color-mint: #c5e1de;
+  --color-teal: #d8ede7;
+  --color-base: #e6f4f1;
+  --color-ink: #333333;
+  --color-ink-soft: #5f6f6a;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1100px 560px at 50% -12%, #d8ede7 0%, transparent 60%),
+    radial-gradient(820px 480px at 102% 2%, #c5e1de 0%, transparent 55%),
+    radial-gradient(720px 440px at -8% 12%, #f1e6c9 0%, transparent 55%),
+    linear-gradient(180deg, #e6f4f1 0%, #dcefe9 100%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(232, 196, 126, 0.4);
+}
+
+/* ---- Glassmorphism ---- */
+.glass {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(14px) saturate(125%);
+  -webkit-backdrop-filter: blur(14px) saturate(125%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.glass-soft {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.shadow-soft {
+  box-shadow:
+    0 10px 30px -12px rgba(60, 90, 80, 0.28),
+    0 2px 8px -4px rgba(60, 90, 80, 0.15);
+}
+
+.shadow-soft-lg {
+  box-shadow:
+    0 22px 50px -18px rgba(60, 90, 80, 0.38),
+    0 4px 12px -6px rgba(60, 90, 80, 0.18);
+}
+
+/* ---- Motion ---- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
