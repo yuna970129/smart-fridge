@@ -12,7 +12,7 @@ function clean(value: string | undefined): string | undefined {
   const v = value.trim();
   if (!v) return undefined;
   // Reject obvious placeholders shipped in .env.example
-  if (/xxx|your-|project-id|changeme|<.+>/i.test(v)) return undefined;
+  if (/xxx|your-|project-id|changeme|replace_me|<.+>/i.test(v)) return undefined;
   return v;
 }
 
@@ -23,8 +23,10 @@ export const supabaseUrl = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
 export const supabaseAnonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 export const supabaseServiceKey = clean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 export const geminiApiKey = clean(process.env.GEMINI_API_KEY);
+export const bizcrushApiKey = clean(process.env.BIZCRUSH_API_KEY);
 
 export const hasSupabase = Boolean(
   supabaseUrl && (supabaseServiceKey || supabaseAnonKey),
 );
 export const hasGemini = Boolean(geminiApiKey);
+export const hasBizcrush = Boolean(bizcrushApiKey);

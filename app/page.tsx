@@ -18,6 +18,12 @@ const actions = [
     desc: "Update your fridge after cooking",
   },
   {
+    href: "/voice",
+    emoji: "🎙️",
+    title: "Voice Command",
+    desc: "Speak to add or remove items",
+  },
+  {
     href: "/fridge",
     emoji: "📋",
     title: "My Fridge",

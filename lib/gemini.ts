@@ -207,3 +207,117 @@ function mockDish(fridgeItems: string[]): RawDishResult {
     ingredients: fridgeItems.slice(0, 4),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Voice command parsing — intent (add | consume) + items             */
+/* ------------------------------------------------------------------ */
+
+export type VoiceAction = "add" | "consume";
+
+export interface VoiceCommand {
+  action: VoiceAction;
+  dishName?: string;
+  items: ScannedItem[]; // { name, emoji }
+}
+
+export async function parseVoiceCommand(
+  transcript: string,
+  fridgeItems: string[],
+): Promise<VoiceCommand> {
+  if (!genAI) return mockVoiceCommand(transcript, fridgeItems);
+
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+  });
+
+  const response = await withRetry(() =>
+    model.generateContent(
+      `You are a fridge assistant. Read the user's spoken sentence and decide ONE action:
+- Bought / got groceries -> action "add": list the purchased food items.
+- Cooked / used food      -> action "consume": give the dish + the ingredients used,
+  matched against the current fridge: ${JSON.stringify(fridgeItems)}.
+Return JSON:
+{ "action": "add" | "consume",
+  "dishName"?: string,
+  "items": [{ "emoji": string, "name": string }] }
+Rules:
+- For "consume", "items" must ONLY contain names from the fridge list above.
+- For "add", include every grocery the user mentioned, with a fitting food emoji.
+- Names in English Title Case. The transcript may be Korean or English.
+
+User said: "${transcript}"`,
+    ),
+  );
+
+  const raw = parseJson<{
+    action?: string;
+    dishName?: string;
+    items?: unknown;
+  }>(response.response.text());
+
+  const action: VoiceAction = raw?.action === "add" ? "add" : "consume";
+  const items = normalizeItems(raw?.items);
+  return {
+    action,
+    dishName: raw?.dishName ? String(raw.dishName).trim() : undefined,
+    items,
+  };
+}
+
+const ADD_HINTS = ["bought", "buy", "got", "purchased", "샀", "사 왔", "사왔", "구매"];
+const CONSUME_HINTS = [
+  "made", "cooked", "ate", "used", "끓였", "만들", "구웠", "먹었", "볶았", "삶았",
+];
+
+/** Keyword heuristic so the voice flow works without a Gemini key. */
+function mockVoiceCommand(
+  transcript: string,
+  fridgeItems: string[],
+): VoiceCommand {
+  const t = transcript.toLowerCase();
+  const isAdd =
+    ADD_HINTS.some((h) => t.includes(h)) &&
+    !CONSUME_HINTS.some((h) => t.includes(h));
+
+  if (isAdd) {
+    // Pull capitalized-ish nouns out of the sentence as grocery names.
+    const stop = new Set([
+      "i","bought","buy","got","some","a","an","the","and","of","with","from",
+      "mart","store","today","just","two","three","couple","few",
+    ]);
+    const words = transcript
+      .replace(/[.,!?]/g, " ")
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w && !stop.has(w.toLowerCase()) && !/^\d+$/.test(w));
+    const seen = new Set<string>();
+    const items: ScannedItem[] = [];
+    for (const w of words) {
+      const name = w[0].toUpperCase() + w.slice(1).toLowerCase();
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ name, emoji: emojiFor(name) });
+      if (items.length >= 12) break;
+    }
+    return { action: "add", items };
+  }
+
+  // consume: match fridge items mentioned in the transcript
+  const used = fridgeItems.filter((f) => {
+    const name = f.toLowerCase();
+    if (t.includes(name)) return true;
+    if (name.endsWith("s") && t.includes(name.slice(0, -1))) return true;
+    return false;
+  });
+  let dishName = "Home Dish";
+  if (t.includes("ramen") || t.includes("라면")) dishName = "Ramen";
+  else if (t.includes("kimchi") || t.includes("김치")) dishName = "Kimchi Jjigae";
+  return {
+    action: "consume",
+    dishName,
+    items: used.map((name) => ({ name, emoji: emojiFor(name) })),
+  };
+}
+
