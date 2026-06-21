@@ -7,6 +7,12 @@ export const dynamic = "force-dynamic";
 
 const actions = [
   {
+    href: "/voice",
+    emoji: "🎙️",
+    title: "Voice Command",
+    desc: "Speak to add, use up, or first-time stock your fridge",
+  },
+  {
     href: "/scan-receipt",
     emoji: "📸",
     title: "Scan Receipt",
@@ -19,12 +25,6 @@ const actions = [
     desc: "Update your fridge after cooking",
   },
   {
-    href: "/voice",
-    emoji: "🎙️",
-    title: "Voice Command",
-    desc: "Speak to add or remove items",
-  },
-  {
     href: "/fridge",
     emoji: "🧊",
     title: "My Fridge",
@@ -32,19 +32,22 @@ const actions = [
   },
 ];
 
-async function getAttentionCount(): Promise<number> {
+async function getExpiring(): Promise<string[]> {
   try {
     const items = await getStore().list("have");
     return items
       .map((i) => withFreshness(i))
-      .filter((i) => i.freshness !== "fresh").length;
+      .filter((i) => i.freshness !== "fresh")
+      .sort((a, b) => a.days_left - b.days_left)
+      .map((i) => i.name);
   } catch {
-    return 0;
+    return [];
   }
 }
 
 export default async function Home() {
-  const attention = await getAttentionCount();
+  const expiring = await getExpiring();
+  const attention = expiring.length;
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
@@ -58,12 +61,18 @@ export default async function Home() {
 
       {attention > 0 && (
         <Link
-          href="/fridge?filter=expiring"
-          className="animate-fade-up mb-6 flex items-center gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 shadow-soft backdrop-blur-sm transition duration-300 hover:bg-amber-100/80"
+          href="/recipes"
+          className="animate-fade-up mb-6 flex items-start gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 shadow-soft backdrop-blur-sm transition duration-300 hover:bg-amber-100/80"
         >
           <span className="text-xl">⚠️</span>
-          <span className="text-[15px] font-semibold text-amber-700">
-            ALERT: {attention} item{attention === 1 ? "" : "s"} expiring!
+          <span className="flex flex-col">
+            <span className="text-[15px] font-semibold text-amber-700">
+              {expiring.slice(0, 2).join(", ")}
+              {attention > 2 ? ` +${attention - 2} more` : ""} expiring
+            </span>
+            <span className="text-[13px] text-amber-700/80">
+              Tap for recipe ideas →
+            </span>
           </span>
         </Link>
       )}
