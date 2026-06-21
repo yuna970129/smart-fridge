@@ -54,7 +54,7 @@ export default async function Home() {
       <div className="animate-fade-up mb-6 text-center">
         <Image src="/banner.webp" alt="What's Left" width={120} height={120} className="mx-auto mb-1" priority />
         <h1 className="text-3xl font-semibold tracking-tight text-ink">
-          What's Left
+          What&apos;s Left
         </h1>
         <p className="mt-2 text-ink-soft">Your smart kitchen companion</p>
       </div>

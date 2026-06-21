@@ -137,7 +137,77 @@ export interface VoiceCommandResult {
     freshness?: import("./freshness").Freshness;
     adjusted?: boolean;
   }>;
+  transcript?: string;
   mock: boolean;
+}
+
+export type VoiceProvider = "bizcrush" | "gemini";
+
+/** Ask the server which voice engine is active (bizcrush vs gemini-direct). */
+export async function getVoiceProvider(): Promise<VoiceProvider> {
+  try {
+    const res = await fetch("/api/voice/config", { cache: "no-store" });
+    const data = await res.json();
+    return data.provider === "gemini" ? "gemini" : "bizcrush";
+  } catch {
+    return "bizcrush";
+  }
+}
+
+/** Wrap recorded PCM16 (mono 16kHz) into a base64 WAV for the audio endpoint. */
+function pcm16ToWavBase64(pcm: Int16Array, sampleRate = 16000): string {
+  const dataLen = pcm.byteLength;
+  const buf = new ArrayBuffer(44 + dataLen);
+  const v = new DataView(buf);
+  const w = (off: number, s: string) => {
+    for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
+  };
+  w(0, "RIFF");
+  v.setUint32(4, 36 + dataLen, true);
+  w(8, "WAVE");
+  w(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  w(36, "data");
+  v.setUint32(40, dataLen, true);
+  new Uint8Array(buf, 44).set(
+    new Uint8Array(pcm.buffer, pcm.byteOffset, dataLen),
+  );
+  // base64-encode
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+/**
+ * Gemini-only voice: send the recorded audio (or the bundled demo voice) to
+ * Gemini in ONE call that transcribes AND parses the command.
+ */
+export async function runVoiceCommandAudio(opts: {
+  pcm?: Int16Array;
+  useMock?: boolean;
+}): Promise<VoiceCommandResult> {
+  const body =
+    opts.useMock || !opts.pcm
+      ? { useMock: true }
+      : { audio: pcm16ToWavBase64(opts.pcm), mimeType: "audio/wav" };
+  const res = await fetch("/api/voice/command-audio", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Could not understand that.");
+  return data as VoiceCommandResult;
 }
 
 export async function runVoiceCommand(

@@ -13,8 +13,11 @@ import {
   startMicRecording,
   transcribe,
   runVoiceCommand,
+  runVoiceCommandAudio,
+  getVoiceProvider,
   type MicRecorder,
   type VoiceCommandResult,
+  type VoiceProvider,
 } from "@/lib/voice";
 import { cn } from "@/lib/cn";
 
@@ -58,6 +61,7 @@ function VoicePageInner() {
     names: [],
   });
   const [onboarding, setOnboarding] = useState(isSetup);
+  const [provider, setProvider] = useState<VoiceProvider>("bizcrush");
 
   const recorderRef = useRef<MicRecorder | null>(null);
 
@@ -78,6 +82,18 @@ function VoicePageInner() {
       active = false;
     };
   }, [isSetup]);
+
+  // Detect which voice engine is active (bizcrush vs gemini-direct).
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const p = await getVoiceProvider();
+      if (active) setProvider(p);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function startVoice() {
     setError(null);
@@ -119,6 +135,17 @@ function VoicePageInner() {
   async function runStt(opts: { pcm?: Int16Array; useMock?: boolean }) {
     setInterim("");
     try {
+      if (provider === "gemini") {
+        // One Gemini call transcribes AND parses the audio.
+        setSttMock(false);
+        setStep("thinking");
+        const cmd = await runVoiceCommandAudio(opts);
+        if (cmd.transcript) setTranscript(cmd.transcript);
+        applyCommand(cmd);
+        return;
+      }
+
+      // BizCrush: stream audio → live transcript, then Gemini parses the text.
       const text = await transcribe(opts, {
         onMock: setSttMock,
         onInterim: setInterim,
@@ -134,41 +161,36 @@ function VoicePageInner() {
         return;
       }
       setTranscript(finalText);
-      await routeCommand(finalText);
+      setStep("thinking");
+      const cmd = await runVoiceCommand(finalText);
+      applyCommand(cmd);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Voice recognition failed.");
       setStep("idle");
     }
   }
 
-  async function routeCommand(text: string) {
-    setStep("thinking");
-    try {
-      const cmd: VoiceCommandResult = await runVoiceCommand(text);
-      setAiMock(cmd.mock);
-      if (cmd.action === "add") {
-        if (!cmd.items.length) {
-          setError("Didn't catch any groceries. Please try again.");
-          setStep("idle");
-          return;
-        }
-        setAddRows(cmd.items.map((i) => ({ ...i, checked: true })));
-        setStep("add");
-      } else {
-        setDishName(cmd.dishName || "Home Dish");
-        setUseRows(
-          cmd.items.map((i) => ({
-            id: i.id as string,
-            name: i.name,
-            emoji: i.emoji,
-            used: true,
-          })),
-        );
-        setStep("consume");
+  function applyCommand(cmd: VoiceCommandResult) {
+    setAiMock(cmd.mock);
+    if (cmd.action === "add") {
+      if (!cmd.items.length) {
+        setError("Didn't catch any groceries. Please try again.");
+        setStep("idle");
+        return;
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not understand that.");
-      setStep("idle");
+      setAddRows(cmd.items.map((i) => ({ ...i, checked: true })));
+      setStep("add");
+    } else {
+      setDishName(cmd.dishName || "Home Dish");
+      setUseRows(
+        cmd.items.map((i) => ({
+          id: i.id as string,
+          name: i.name,
+          emoji: i.emoji,
+          used: true,
+        })),
+      );
+      setStep("consume");
     }
   }
 
@@ -319,7 +341,9 @@ function VoicePageInner() {
       {step === "thinking" && (
         <div className="flex min-h-72 flex-col items-center justify-center gap-4 text-center">
           <Spinner />
-          <p className="text-lg font-medium text-ink">Understanding…</p>
+          <p className="text-lg font-medium text-ink">
+            {provider === "gemini" ? "Transcribing & understanding…" : "Understanding…"}
+          </p>
           {transcript && (
             <p className="max-w-xs text-sm text-ink-soft">“{transcript}”</p>
           )}

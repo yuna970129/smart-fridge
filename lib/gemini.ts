@@ -218,6 +218,8 @@ export interface VoiceCommand {
   action: VoiceAction;
   dishName?: string;
   items: ScannedItem[]; // { name, emoji }
+  /** What Gemini heard (only populated by the audio-direct path). */
+  transcript?: string;
 }
 
 export async function parseVoiceCommand(
@@ -233,7 +235,16 @@ export async function parseVoiceCommand(
 
   const response = await withRetry(() =>
     model.generateContent(
-      `You are a fridge assistant. Read the user's spoken sentence and decide ONE action:
+      `${voiceCommandRules(fridgeItems)}\n\nUser said: "${transcript}"`,
+    ),
+  );
+
+  return toVoiceCommand(response.response.text());
+}
+
+/** Shared prompt describing the add/consume + timing schema. */
+function voiceCommandRules(fridgeItems: string[]): string {
+  return `You are a fridge assistant. Read the user's spoken sentence and decide ONE action:
 - Bought / got / have groceries -> action "add": list the food items.
 - Cooked / used food            -> action "consume": give the dish + the ingredients used,
   matched against the current fridge: ${JSON.stringify(fridgeItems)}.
@@ -252,25 +263,51 @@ Rules:
     * "bought 3 days ago" / "got it last week" / "3일 전에 샀어"   -> "boughtDaysAgo": 3 / 7 / 3
   (1 week = 7 days. "left / remaining / 남았어" means days until expiry =
    expiresInDays. Omit the fields when no timing is mentioned.)
-- Names in English Title Case. The transcript may be Korean or English.
+- Names in English Title Case. The transcript may be Korean or English.`;
+}
 
-User said: "${transcript}"`,
-    ),
-  );
-
+function toVoiceCommand(text: string): VoiceCommand {
   const raw = parseJson<{
     action?: string;
     dishName?: string;
+    transcript?: string;
     items?: unknown;
-  }>(response.response.text());
-
+  }>(text);
   const action: VoiceAction = raw?.action === "add" ? "add" : "consume";
-  const items = normalizeVoiceItems(raw?.items);
   return {
     action,
     dishName: raw?.dishName ? String(raw.dishName).trim() : undefined,
-    items,
+    transcript: raw?.transcript ? String(raw.transcript).trim() : undefined,
+    items: normalizeVoiceItems(raw?.items),
   };
+}
+
+/**
+ * Gemini-only voice: transcribe AND parse the spoken command in ONE multimodal
+ * call (no separate STT step). `audioBase64` is a WAV (PCM16 16kHz mono).
+ */
+export async function parseVoiceCommandFromAudio(
+  audioBase64: string,
+  mimeType: string,
+  fridgeItems: string[],
+): Promise<VoiceCommand> {
+  if (!genAI) return { ...mockVoiceCommand("I made ramen", fridgeItems) };
+
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+  });
+
+  const response = await withRetry(() =>
+    model.generateContent([
+      { inlineData: { data: audioBase64, mimeType } },
+      `${voiceCommandRules(fridgeItems)}
+- FIRST transcribe the spoken audio above, then apply the rules to that text.
+- Also include a "transcript" field with what you heard.`,
+    ]),
+  );
+
+  return toVoiceCommand(response.response.text());
 }
 
 /** Like normalizeItems but also carries optional onboarding timing fields. */

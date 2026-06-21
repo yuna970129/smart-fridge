@@ -30,3 +30,21 @@ export const hasSupabase = Boolean(
 );
 export const hasGemini = Boolean(geminiApiKey);
 export const hasBizcrush = Boolean(bizcrushApiKey);
+
+/**
+ * Which engine transcribes voice input:
+ * - "bizcrush": BizCrush live STT (speech→text) → Gemini (text→intent). Two hops,
+ *   streams live interim text.
+ * - "gemini": Gemini multimodal handles audio directly (speech→intent in ONE
+ *   call). Faster, no live interim.
+ * Defaults to gemini when a Gemini key exists (faster), else bizcrush.
+ */
+export type VoiceProvider = "bizcrush" | "gemini";
+export const voiceProvider: VoiceProvider =
+  clean(process.env.VOICE_PROVIDER) === "bizcrush"
+    ? "bizcrush"
+    : clean(process.env.VOICE_PROVIDER) === "gemini"
+      ? "gemini"
+      : hasGemini
+        ? "gemini"
+        : "bizcrush";
