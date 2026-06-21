@@ -128,15 +128,17 @@ Gemini → { "action": "add", "items": [
 
 **Expiry math (server-side):**
 
-| What the user says            | Field             | `expires_at` becomes              |
-| ----------------------------- | ----------------- | --------------------------------- |
-| (no timing)                   | —                 | today + **category average**      |
-| "expires in 2 weeks"          | `expiresInDays:14`| today + **14 days**               |
-| "bought 3 days ago"           | `boughtDaysAgo:3` | today + (**average − 3**) days    |
-| "got it last week" (≈7d ago)  | `boughtDaysAgo:7` | today + (**average − 7**) days    |
+| What the user says                       | Field             | `expires_at` becomes              |
+| ---------------------------------------- | ----------------- | --------------------------------- |
+| (no timing)                              | —                 | today + **category average**      |
+| "expires in 2 weeks"                     | `expiresInDays:14`| today + **14 days**               |
+| "2 weeks left" / "3 days left" / "2주 남았어" | `expiresInDays`   | today + **stated days left**      |
+| "bought 3 days ago" / "3일 전에 샀어"       | `boughtDaysAgo:3` | today + (**average − 3**) days    |
+| "got it last week" (≈7d ago)             | `boughtDaysAgo:7` | today + (**average − 7**) days    |
 
-So a carrot (avg 14d) **bought 3 days ago** → 11 days left, and one **bought 2
-weeks ago** → already expired (🔴). This keeps freshness 🟢🟡🔴 honest from day one.
+So a carrot (avg 14d) **bought 3 days ago** → 11 days left; "**3 days left / 3일
+남았어**" → exactly 3 days left; and one **bought 2 weeks ago** → already expired
+(🔴). This keeps freshness 🟢🟡🔴 honest from day one.
 
 ### Step 3️⃣ — Confirm & Save
 

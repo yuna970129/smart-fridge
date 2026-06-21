@@ -247,9 +247,11 @@ Rules:
 - For "add", include every grocery the user mentioned, with a fitting food emoji.
 - TIMING (only for "add"): if the user says when an item expires or was bought,
   capture it as a NUMBER OF DAYS:
-    * "expires in 2 weeks" / "good for 5 days"  -> "expiresInDays": 14 / 5
-    * "bought 3 days ago" / "got it last week"  -> "boughtDaysAgo": 3 / 7
-  (1 week = 7 days. Omit the fields when no timing is mentioned.)
+    * "expires in 2 weeks" / "good for 5 days"          -> "expiresInDays": 14 / 5
+    * "2 weeks left" / "3 days left" / "2주 남았어" / "3일 남았어" -> "expiresInDays": 14 / 3 / 14 / 3
+    * "bought 3 days ago" / "got it last week" / "3일 전에 샀어"   -> "boughtDaysAgo": 3 / 7 / 3
+  (1 week = 7 days. "left / remaining / 남았어" means days until expiry =
+   expiresInDays. Omit the fields when no timing is mentioned.)
 - Names in English Title Case. The transcript may be Korean or English.
 
 User said: "${transcript}"`,
@@ -321,19 +323,49 @@ function wordedDays(numText: string, unit: string): number {
   return /week/.test(unit) ? n * 7 : n;
 }
 
-/** Extract "expires in N (days|weeks)" / "N (days|weeks) ago" from a chunk. */
+/** Convert a Korean unit + number to days (주=week, 일=day). */
+function koreanDays(numText: string, unit: string): number {
+  const small: Record<string, number> = {
+    한: 1, 하루: 1, 일주일: 7, 이: 2, 두: 2, 삼: 3, 세: 3, 사: 4, 네: 4,
+    오: 5, 다섯: 5, 육: 6, 칠: 7, 일: 1,
+  };
+  const n = /^\d+$/.test(numText) ? parseInt(numText, 10) : small[numText] ?? 1;
+  return unit.includes("주") ? n * 7 : n;
+}
+
+/** Extract expiry/purchase timing from a chunk (English + Korean). */
 function parseTiming(chunk: string): {
   expiresInDays?: number;
   boughtDaysAgo?: number;
 } {
   const c = chunk.toLowerCase();
   const num = "(\\d+|a|an|one|two|three|four|five|six|couple|few|several)";
-  const exp = new RegExp(`(?:expires?|good|lasts?)\\s+(?:in|for)\\s+${num}\\s*(day|days|week|weeks)`).exec(c);
-  if (exp) return { expiresInDays: wordedDays(exp[1], exp[2]) };
+
+  // --- English: remaining time → expiresInDays ---
+  const expIn = new RegExp(
+    `(?:expires?|good|lasts?)\\s+(?:in|for)\\s+${num}\\s*(day|days|week|weeks)`,
+  ).exec(c);
+  if (expIn) return { expiresInDays: wordedDays(expIn[1], expIn[2]) };
+  const left = new RegExp(
+    `${num}\\s*(day|days|week|weeks)\\s+(?:left|remaining|to go)`,
+  ).exec(c);
+  if (left) return { expiresInDays: wordedDays(left[1], left[2]) };
+
+  // --- English: purchase time → boughtDaysAgo ---
   const ago = new RegExp(`${num}\\s*(day|days|week|weeks)\\s+ago`).exec(c);
   if (ago) return { boughtDaysAgo: wordedDays(ago[1], ago[2]) };
   if (/last week/.test(c)) return { boughtDaysAgo: 7 };
   if (/yesterday/.test(c)) return { boughtDaysAgo: 1 };
+
+  // --- Korean: "N일/주 남았어" → expiresInDays ---
+  const koLeft = /(\d+|한|두|세|네|다섯|일|이|삼|사|오)\s*(일|주|주일)\s*(?:남았|남음|남아)/.exec(
+    chunk,
+  );
+  if (koLeft) return { expiresInDays: koreanDays(koLeft[1], koLeft[2]) };
+  // --- Korean: "N일/주 전에 샀어" → boughtDaysAgo ---
+  const koAgo = /(\d+|한|두|세|네|다섯|일|이|삼|사|오)\s*(일|주|주일)\s*전/.exec(chunk);
+  if (koAgo) return { boughtDaysAgo: koreanDays(koAgo[1], koAgo[2]) };
+
   return {};
 }
 
