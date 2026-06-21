@@ -22,6 +22,39 @@
 > - **Home 경고 배너**: 주의 필요(🟡+🔴) 개수 표시 → `/fridge?filter=expiring` 링크.
 > - **My Fridge**: 상태 점 + 남은 일수 + `All/Fresh/Expiring` 필터, 임박 순 정렬.
 > - 데모 시드는 세 가지 색이 모두 보이도록 `expires_at`을 직접 지정.
+>
+> 🎙️ **v3 (음성 Voice Command)** — BizCrush 실시간 STT + Gemini 의도 분류
+> - **Home 4번째 버튼 "🎙️ Voice Command"** → 독립 `/voice` 페이지 (Check Dish는 사진 전용).
+> - **서버 브릿지 방식**(키 비노출, Vercel 호환): 브라우저가 BizCrush에 직결하지
+>   않고, `POST /api/voice/transcribe`(스트리밍 NDJSON)가 서버에서
+>   `wss://extapi.bizcrush.ai/v1/stt/stream`로 PCM16(16kHz mono, 640B/20ms 프레임)을
+>   흘려보내며 interim/final을 클라이언트로 중계(`lib/bizcrush.ts`).
+> - **마이크 캡처**: `public/pcm16-worklet.js`(AudioWorklet)로 Float32→PCM16 16kHz
+>   다운샘플 후 서버로 전송(`lib/voice.ts`).
+> - **mock voice**: `public/mock-voice.pcm`(eSpeak 합성 "I made ramen with an egg")을
+>   `useMock`로 보내면 **실제 BizCrush가 인식** → 마이크 없이도 데모/검증 가능.
+> - **BizCrush 키 없으면**: 단어별 mock transcript로 폴백(실시간처럼 표시).
+> - **Gemini 의도 분류** (`parseVoiceCommand`, `POST /api/voice/command`): transcript →
+>   `{action:"add"|"consume", dishName?, items}` 단일 호출.
+>   - 🛒 `add`("샀어/bought") → 이모지+카테고리 유통기한 부여 → Confirm & Save(`POST /api/fridge`)
+>   - 🍽️ `consume`("끓였어/made") → 냉장고 row 매칭 → Used-it 체크리스트 → `PATCH gone`
+>   - 키 없으면 키워드 휴리스틱(bought/샀→add, made/끓였→consume)으로 폴백.
+> - **🚀 Quick Voice Setup(온보딩)**: Home 최상단 "👋 Quick Voice Setup" CTA → `/voice?setup=1`
+>   (냉장고가 비어도 자동 온보딩). "I have / 있어 …"를 add로 처리(`ADD_HINTS`) → 한 문장에서
+>   여러 품목을 일괄 추가. 사진 없이 초기 재고 등록.
+> - **🕒 구매 시점 → 유통기한 반영**: add 시 Gemini가 품목별 `expiresInDays`("2주 뒤 만료")·
+>   `boughtDaysAgo`("3일 전 구매")를 추출 → 서버(`/api/voice/command`+`lib/store.ts resolveExpiry`)가
+>   `expires_at = today + (expiresInDays | avg − boughtDaysAgo | avg)`로 계산.
+>   키 없으면 `parseTiming()` 정규식 폴백. 신선도 🟢🟡🔴는 그 expires_at에서 그대로 도출.
+>
+> 💡 **레시피 추천**은 아래 별도 항목 참조.
+> 💡 **레시피 추천 (Smart Recipe Suggestion)** — `user_scenario_complete_final.md` 6️⃣
+> - **Home 만료 경고 배너** → `/recipes` 링크(배너에 임박 품목 이름 표시).
+> - `GET /api/recipes`: 냉장고 + 만료 항목(🟡/🔴)을 Gemini(`suggestRecipes`)에 보내 3개 추천.
+>   레시피1은 **fridge-only**, 2·3은 **need-to-buy** 포함. 응답에 매칭된 냉장고 row(id+신선도) 부착.
+> - `/recipes` 페이지: 목록 → 상세(필수재료 만료 강조 + 살 것 + 조리법) → [Cooked!] →
+>   Check Dish식 Used-it 체크리스트 → `PATCH gone`으로 냉장고 차감.
+> - 키 없으면 결정론적 mock 레시피(만료 항목 우선)로 폴백.
 
 ---
 

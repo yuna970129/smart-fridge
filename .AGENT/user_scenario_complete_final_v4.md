@@ -15,18 +15,24 @@
 2. **🍽️ Check Dish** — Two ways to record what you cooked:
    - 📷 Upload a dish photo (original)
    - 🎙️ Speak what you cooked (new voice STT)
-3. **📋 My Fridge** — View all ingredients with freshness status (🟢🟡🔴) + manage expiry
+3. **💡 Smart Recipe Suggestion** — AI recommends recipes based on expiring items (use only fridge vs. need to buy)
+4. **📋 My Fridge** — View all ingredients with freshness status (🟢🟡🔴) + manage expiry
 
 ---
 
-## 1️⃣ Home Screen
+## 1️⃣ Home Screen (Updated)
 
 ```
 ┌─────────────────────────────┐
 │                             │
 │      🧊 Fridge AI           │
 │                             │
-│  ⚠️ ALERT: 2 items expiring! │
+│  👋 New here? Tell us what  │
+│     you have (tap to record)│ ← Quick voice setup
+│                             │
+│  ⚠️ Smart Recipe Banner      │
+│  "Onion, Carrot expiring.   │
+│   Click for recipes!"        │
 │                             │
 │  ┌─────────────────────┐    │
 │  │  📸 Scan Receipt    │    │
@@ -37,19 +43,40 @@
 │  └─────────────────────┘    │
 │                             │
 │  ┌─────────────────────┐    │
+│  │  🎙️ Voice Command   │    │ ← Add/Remove by voice
+│  └─────────────────────┘    │
+│                             │
+│  ┌─────────────────────┐    │
 │  │  📋 My Fridge       │    │
 │  └─────────────────────┘    │
 │                             │
 └─────────────────────────────┘
 ```
 
+**Quick Voice Setup Banner:**
+- Always visible on Home Screen
+- Simple prompt: "👋 Quick Voice Setup? Tell us what you have"
+- Click → Voice recording mode
+- User speaks: "I have eggs, carrots that expire in 2 weeks, milk..."
+- AI parses ingredients + expiry dates → saves to DB
+- Useful for: Initial setup, adding multiple items at once, quick batch update
+
+**🎙️ Voice Command (Always Available):**
+- Tap to add or remove items by voice
+- Example: "Add garlic" → saves to fridge
+- Example: "Remove milk" → removes from fridge
+
 **Urgent Expiring Banner:**
 - Shows count of items expiring soon (🟡) or expired (🔴)
+- **🆕 Now clickable** → Navigate to Smart Recipe Suggestions
 - Hidden when no items need attention
 
 **User Actions:**
+- Tap "👋 Quick setup" → Initial voice input (first time only)
+- Tap "⚠️ Smart Recipe Banner" → Recipe recommendations
 - Tap "📸 Scan Receipt"
 - Tap "🍽️ Check Dish"
+- Tap "🎙️ Voice Command" → Add/remove items by voice
 - Tap "📋 My Fridge"
 
 ---
@@ -108,7 +135,80 @@
 
 ---
 
-## 3️⃣ Check Dish — Photo Path (Original)
+## 2️⃣ Quick Voice Setup (Always Available)
+
+### Step 1️⃣ — Voice Recording
+
+When user taps "👋 Quick Voice Setup? Tell us what you have":
+
+```
+┌─────────────────────────────┐
+│  What's in your fridge?     │
+│                             │
+│         🎙️ Recording...     │
+│                             │
+│  "I have eggs, carrot that  │
+│   expires in 2 weeks, milk, │
+│   garlic..."                │
+│                             │
+│  [Stop Recording]           │
+│  [← Cancel]                 │
+└─────────────────────────────┘
+```
+
+**What User Does:**
+- Tap 🎙️ → BizCrush STT starts recording
+- Speak naturally about fridge contents
+- Example: "I have eggs, carrots that expire in 2 weeks, milk, some leftover sauce..."
+- Real-time transcript displays below mic
+- Tap **[Stop Recording]** when done
+
+---
+
+### Step 2️⃣ — AI Parsing & Save
+
+```
+┌─────────────────────────────┐
+│  Extracting ingredients...  │
+│                             │
+│  Found:                     │
+│  ✓ 🥚 Eggs                 │
+│  ✓ 🥕 Carrot (2 weeks)     │
+│  ✓ 🥛 Milk                 │
+│  ✓ 🧄 Garlic               │
+│  ✓ 🍲 Sauce                │
+│                             │
+│  [Save to Fridge]           │
+│  [Re-record]                │
+└─────────────────────────────┘
+```
+
+**What Happens:**
+- AI extracts ingredients from voice transcript
+- If user mentioned expiry ("2 weeks", "expires next month"), AI parses and calculates exact date
+- Each item gets emoji + expiry date
+- Tap **[Save to Fridge]** → all saved to DB with status 🟢 Fresh
+- Returns to Home Screen
+
+---
+
+## 3️⃣ Voice Command (Always Available)
+
+Users can add/remove items anytime via voice.
+
+### Usage
+
+```
+Tap 🎙️ Voice Quick Add
+   ↓
+User speaks: "Add garlic" → Garlic saved to fridge (default expiry)
+User speaks: "Remove milk" → Milk removed from fridge
+User speaks: "I just bought eggs, expires in 30 days" → Egg saved with custom expiry
+```
+
+---
+
+## 4️⃣ Check Dish — Photo Path (Original)
 
 ### Step 1️⃣ — Upload Dish Photo
 
@@ -169,7 +269,7 @@
 
 ---
 
-## 4️⃣ Check Dish — Voice Path (NEW)
+## 5️⃣ Check Dish — Voice Path (NEW)
 
 ### Step 1️⃣ — Choose Input: Photo or Voice
 
@@ -181,12 +281,6 @@
 │  │   📷  Upload a photo   │  │
 │  └───────────────────────┘  │
 │                             │
-│        — or —               │
-│                             │
-│      ┌───────────┐          │
-│      │    🎙️     │          │
-│      └───────────┘          │
-│   "Tell me what you cooked" │
 │                             │
 │  ← Back                     │
 └─────────────────────────────┘
@@ -275,7 +369,125 @@ LLM Output:
 
 ---
 
-## 5️⃣ My Fridge
+## 6️⃣ Smart Recipe Suggestion (NEW)
+
+### Step 1️⃣ — Recommended Recipes List
+
+When user taps the **⚠️ Smart Recipe Banner**, AI analyzes expiring items and generates recipe suggestions.
+
+```
+┌─────────────────────────────┐
+│  💡 Recommended Recipes     │
+│                             │
+│  Option 1                   │
+│  🍳 Fried Rice              │
+│  (Carrot, Onion, Egg)       │
+│  ✓ Uses only fridge items   │
+│                             │
+│  Option 2                   │
+│  🍲 Veggie Curry            │
+│  (Carrot, Onion + Potato,   │
+│   Curry Powder)             │
+│  ⚠️ Need to buy: 2 items    │
+│                             │
+│  Option 3                   │
+│  🥗 Egg Salad               │
+│  (Egg + Lettuce, Mayo)      │
+│  ⚠️ Need to buy: 2 items    │
+│                             │
+│  [← Back to Home]           │
+└─────────────────────────────┘
+```
+
+**What User Sees:**
+- **Option 1: "Fridge-only"** — Uses only current ingredients
+- **Option 2 & 3: "Fridge + Add-ons"** — Suggests items to buy for better dishes
+- Categorized by required vs. optional ingredients
+
+**User Action:** Tap on a recipe to see details.
+
+---
+
+### Step 2️⃣ — Recipe Details & Instructions
+
+```
+┌─────────────────────────────┐
+│  🍲 Veggie Curry            │
+│                             │
+│  Required (From Fridge):    │
+│  • 🟡 Carrot (Expiring!)    │
+│  • 🟡 Onion (Expiring!)     │
+│                             │
+│  Need to Buy:               │
+│  • Potato                   │
+│  • Curry Powder             │
+│                             │
+│  Instructions:              │
+│  1. Chop all veggies        │
+│  2. Add water and curry     │
+│  3. Simmer 20 minutes       │
+│  4. Serve hot               │
+│                             │
+│  [🍳 Cooked! (Next)]        │
+│  [← Back]                   │
+└─────────────────────────────┘
+```
+
+**What User Sees:**
+- Recipe name & ingredients breakdown
+- Required items from fridge (highlighted if expiring)
+- Additional items to buy
+- Step-by-step instructions
+
+**User Action:** Tap **[🍳 Cooked! (Next)]** when done cooking.
+
+---
+
+### Step 3️⃣ — Confirm Used Items (Like Check Dish)
+
+Just like Check Dish, user selects which items were fully used vs. partially used.
+
+```
+┌─────────────────────────────┐
+│  Did you use these?          │
+│                             │
+│  🥕 Carrot                  │
+│    [Still have] [Used all]  │
+│                             │
+│  🧅 Onion                   │
+│    [Still have] [Used all]  │
+│                             │
+│  [Confirm]   [Back]         │
+└─────────────────────────────┘
+```
+
+**What User Sees:**
+- All fridge ingredients used in the recipe
+- For each: "Still have" or "Used all" buttons (just like Check Dish)
+
+**User Action:**
+- Toggle each ingredient (Still have = keep, Used all = remove)
+- Tap **[Confirm]** → items marked "Used all" are removed from fridge
+
+---
+
+### Step 4️⃣ — Update Fridge
+
+When user taps **[Confirm]**:
+- Items marked "Used all" are removed from fridge
+- User is returned to Home screen
+- Fridge inventory automatically updated
+
+```
+Example:
+Before: [Carrot: 🟡], [Onion: 🟡]
+If user selects: Carrot "Used all", Onion "Still have"
+After: [Onion: 🟡] (only Carrot removed)
+```
+
+---
+
+## 7️⃣ My Fridge
 
 ```
 ┌───────────────────────────────────┐
@@ -325,18 +537,23 @@ LLM Output:
 5. All added to fridge (🟢 Fresh)
 ```
 
-### Day 2: Cooking (Voice)
+### Day 2: Smart Recipe Recommendations
 
 ```
-1. Home → "🍽️ Check Dish"
-2. Tap 🎙️ mic
-3. Speak: "라면 끓였어. 계란"
-4. Transcript: "I made ramen with egg"
-5. AI: dish=Ramen, ingredients=[Ramen, Eggs]
-6. Checklist:
-   - Ramen: [Still have] [Used all]
-   - Eggs: [Still have] [Used all]
-7. Tap Confirm → selected items removed from fridge
+1. Home → See "⚠️ Smart Recipe Banner: Carrot, Onion expiring"
+2. Tap banner → Recipe recommendations
+3. AI suggests:
+   - 🍳 Fried Rice (fridge-only)
+   - 🍲 Veggie Curry (needs Potato, Curry Powder)
+   - 🥗 Egg Salad (needs Lettuce, Mayo)
+4. Tap "🍲 Veggie Curry"
+5. View ingredients + instructions
+6. Follow instructions and cook
+7. Tap "🍳 Cooked! (Next)"
+8. Confirm used items:
+   - Carrot: [Still have] or [Used all] ← select
+   - Onion: [Still have] or [Used all] ← select
+9. Tap Confirm → selected items removed (like Check Dish)
 ```
 
 ### Day 3: Fridge Check
@@ -354,14 +571,17 @@ LLM Output:
 
 | Feature | Required? | Description |
 |---------|-----------|-------------|
-| **Home Screen** | ✅ | 3 buttons + Alert banner |
+| **Home Screen** | ✅ | 3 buttons + Alert banner (now clickable for recipes) |
 | **Scan Receipt** | ✅ | Upload → AI extract → auto-expiry → save |
 | **Check Dish (Photo)** | ✅ | Upload → AI identify → checklist |
 | **Check Dish (Voice)** | ✅ | 🎙️ tap → BizCrush STT → AI identify → checklist |
+| **🆕 Smart Recipe Suggestion** | ✅ | AI recommends recipes based on expiring items |
+| **🆕 Fridge-only vs Add-ons** | ✅ | Categorize recipes (use only fridge vs. need to buy) |
+| **🆕 Auto-deduct** | ✅ | [Cooked!] button → auto-remove used items from fridge |
 | **My Fridge** | ✅ | View all + filter + delete |
 | **Status Icons** | ✅ | 🟢🟡🔴 auto-calculated daily |
 | **Database** | ✅ | Store ingredients + expiry + status |
-| **AI (LLM)** | ✅ | Recognize receipt/dish/voice, parse ingredients |
+| **AI (LLM)** | ✅ | Recognize receipt/dish/voice, parse ingredients, suggest recipes |
 | **BizCrush STT** | ✅ | Real-time voice transcription |
 | **Multi-language** | ✅ | BizCrush auto-detects Korean + English |
 
