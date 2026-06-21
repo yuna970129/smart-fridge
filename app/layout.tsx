@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Fridge AI",
+  title: "What's Left",
   description:
     "Scan receipts, check cooked dishes, and manage your fridge — powered by AI.",
 };
