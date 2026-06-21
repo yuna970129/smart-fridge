@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getStore } from "@/lib/store";
 import { withFreshness } from "@/lib/freshness";
 
@@ -25,7 +26,7 @@ const actions = [
   },
   {
     href: "/fridge",
-    emoji: "📋",
+    emoji: "🧊",
     title: "My Fridge",
     desc: "See and manage your ingredients",
   },
@@ -48,7 +49,7 @@ export default async function Home() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-12">
       <div className="animate-fade-up mb-6 text-center">
-        <div className="mb-3 text-6xl">🧊</div>
+        <Image src="/banner.webp" alt="Fridge AI" width={120} height={120} className="mx-auto mb-1" priority />
         <h1 className="text-3xl font-semibold tracking-tight text-ink">
           Fridge AI
         </h1>
