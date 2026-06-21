@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Screen } from "@/components/Screen";
 import { Button } from "@/components/Button";
 import { Spinner } from "@/components/Spinner";
 import { Badge } from "@/components/Badge";
 import { CheckIcon, MicIcon, StopIcon } from "@/components/icons";
-import { addToFridge, setIngredientStatus } from "@/lib/api";
+import { addToFridge, getFridge, setIngredientStatus } from "@/lib/api";
 import {
   startMicRecording,
   transcribe,
@@ -37,8 +37,26 @@ export default function VoicePage() {
     verb: "",
     names: [],
   });
+  const [onboarding, setOnboarding] = useState(false);
 
   const recorderRef = useRef<MicRecorder | null>(null);
+
+  // First-launch onboarding: if the fridge is empty, nudge the user to stock it
+  // by speaking a long inventory ("I have eggs, milk, carrots, kimchi…").
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const items = await getFridge();
+        if (active) setOnboarding(items.length === 0);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function startVoice() {
     setError(null);
@@ -179,9 +197,35 @@ export default function VoicePage() {
 
       {step === "idle" && (
         <div className="flex flex-col items-center gap-6 py-4 text-center">
+          {onboarding && (
+            <div className="glass w-full rounded-3xl p-5 text-left shadow-soft">
+              <p className="text-base font-semibold text-ink">
+                👋 Welcome! Let&apos;s stock your fridge
+              </p>
+              <p className="mt-1.5 text-sm text-ink-soft">
+                Your fridge is empty. Already have groceries at home? No need to
+                photograph each one — just tap the mic and{" "}
+                <b>list everything you have</b> in one go.
+              </p>
+              <p className="mt-2 rounded-xl bg-white/55 px-3 py-2 text-sm italic text-ink-soft">
+                “I have eggs, milk, carrots, butter, kimchi, garlic and some
+                green onions.”
+              </p>
+            </div>
+          )}
+
           <p className="text-[15px] text-ink-soft">
-            Just talk — say what you <b>bought</b> or what you <b>cooked</b>, and
-            I&apos;ll update your fridge.
+            {onboarding ? (
+              <>
+                Say <b>everything in your fridge</b> — I&apos;ll add it all at
+                once.
+              </>
+            ) : (
+              <>
+                Just talk — say what you <b>bought</b> or what you <b>cooked</b>,
+                and I&apos;ll update your fridge.
+              </>
+            )}
           </p>
           <button
             type="button"
@@ -192,8 +236,14 @@ export default function VoicePage() {
             <MicIcon className="h-10 w-10" />
           </button>
           <div className="text-sm text-ink-soft">
-            <p>e.g. &quot;I bought milk and apples&quot;</p>
-            <p>or &quot;I made ramen with an egg&quot;</p>
+            {onboarding ? (
+              <p>Take your time — list as many items as you like.</p>
+            ) : (
+              <>
+                <p>e.g. &quot;I bought milk and apples&quot;</p>
+                <p>or &quot;I made ramen with an egg&quot;</p>
+              </>
+            )}
           </div>
           <button
             type="button"

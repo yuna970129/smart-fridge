@@ -265,7 +265,10 @@ User said: "${transcript}"`,
   };
 }
 
-const ADD_HINTS = ["bought", "buy", "got", "purchased", "샀", "사 왔", "사왔", "구매"];
+const ADD_HINTS = [
+  "bought", "buy", "got", "purchased", "have", "there's", "there is", "stocked",
+  "샀", "사 왔", "사왔", "구매", "있어", "있다", "샀어",
+];
 const CONSUME_HINTS = [
   "made", "cooked", "ate", "used", "끓였", "만들", "구웠", "먹었", "볶았", "삶았",
 ];
@@ -283,8 +286,9 @@ function mockVoiceCommand(
   if (isAdd) {
     // Pull capitalized-ish nouns out of the sentence as grocery names.
     const stop = new Set([
-      "i","bought","buy","got","some","a","an","the","and","of","with","from",
-      "mart","store","today","just","two","three","couple","few",
+      "i","bought","buy","got","have","some","a","an","the","and","of","with","from",
+      "mart","store","today","just","two","three","couple","few","there","is","also",
+      "my","fridge","in","there's","stocked","purchased",
     ]);
     const words = transcript
       .replace(/[.,!?]/g, " ")
@@ -321,3 +325,149 @@ function mockVoiceCommand(
   };
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Smart recipe suggestions from (expiring) fridge items              */
+/* ------------------------------------------------------------------ */
+
+export interface RecipeSuggestion {
+  emoji: string;
+  name: string;
+  /** Ingredient names that come from the fridge (must match fridge items). */
+  fridgeIngredients: string[];
+  /** Extra ingredients the user would need to buy. */
+  needToBuy: string[];
+  /** Step-by-step instructions. */
+  instructions: string[];
+}
+
+export interface RecipeContextItem {
+  name: string;
+  expiring: boolean;
+}
+
+export async function suggestRecipes(
+  items: RecipeContextItem[],
+): Promise<RecipeSuggestion[]> {
+  const fridgeNames = items.map((i) => i.name);
+  const expiring = items.filter((i) => i.expiring).map((i) => i.name);
+
+  if (!genAI) return mockRecipes(items);
+
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    generationConfig: { responseMimeType: "application/json", temperature: 0.4 },
+  });
+
+  const response = await withRetry(() =>
+    model.generateContent(
+      `You are a home-cooking assistant. Suggest 3 recipes that use up my fridge
+ingredients, PRIORITIZING the ones that are expiring soon.
+
+My fridge: ${JSON.stringify(fridgeNames)}
+Expiring soon (use these first): ${JSON.stringify(expiring.length ? expiring : fridgeNames)}
+
+Rules:
+- Recipe 1 MUST use ONLY fridge items (empty "needToBuy").
+- Recipes 2 and 3 may add a few common extra items ("needToBuy").
+- "fridgeIngredients" must be names taken EXACTLY from my fridge list.
+- Keep instructions to 3-5 short steps.
+Return JSON:
+{ "recipes": [
+  { "emoji": "🍳", "name": "Fried Rice",
+    "fridgeIngredients": ["Carrot","Eggs"],
+    "needToBuy": [],
+    "instructions": ["Chop the carrot", "Fry with rice and egg", "Season and serve"] }
+] }`,
+    ),
+  );
+
+  const raw = parseJson<{ recipes?: unknown }>(response.response.text());
+  const list = Array.isArray(raw?.recipes) ? raw.recipes : [];
+  const fridgeLower = new Map(fridgeNames.map((n) => [n.toLowerCase(), n]));
+
+  const recipes: RecipeSuggestion[] = [];
+  for (const entry of list) {
+    const r = entry as Record<string, unknown>;
+    const name = String(r.name ?? "").trim();
+    if (!name) continue;
+    // Keep only real fridge names; everything else becomes "need to buy".
+    const fridgeIngredients: string[] = [];
+    for (const ing of Array.isArray(r.fridgeIngredients) ? r.fridgeIngredients : []) {
+      const canonical = fridgeLower.get(String(ing).trim().toLowerCase());
+      if (canonical && !fridgeIngredients.includes(canonical)) {
+        fridgeIngredients.push(canonical);
+      }
+    }
+    const needToBuy = (Array.isArray(r.needToBuy) ? r.needToBuy : [])
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+    const instructions = (Array.isArray(r.instructions) ? r.instructions : [])
+      .map((s) => String(s).trim())
+      .filter(Boolean);
+    recipes.push({
+      emoji: String(r.emoji ?? "").trim() || "🍲",
+      name,
+      fridgeIngredients,
+      needToBuy,
+      instructions,
+    });
+    if (recipes.length >= 3) break;
+  }
+  return recipes.length ? recipes : mockRecipes(items);
+}
+
+/** Deterministic recipe suggestions when no Gemini key is configured. */
+function mockRecipes(items: RecipeContextItem[]): RecipeSuggestion[] {
+  const names = items.map((i) => i.name);
+  const has = (n: string) => names.some((x) => x.toLowerCase() === n.toLowerCase());
+  // Prefer expiring items, then the rest, as the "hero" ingredients.
+  const ordered = [
+    ...items.filter((i) => i.expiring).map((i) => i.name),
+    ...items.filter((i) => !i.expiring).map((i) => i.name),
+  ];
+  const pick = (n: number) => ordered.slice(0, n);
+
+  const recipes: RecipeSuggestion[] = [];
+
+  // 1) Fridge-only
+  recipes.push({
+    emoji: "🍳",
+    name: has("Eggs") ? "Veggie Fried Rice" : "Fridge Stir-Fry",
+    fridgeIngredients: pick(3),
+    needToBuy: [],
+    instructions: [
+      "Chop the fridge ingredients.",
+      "Stir-fry over medium-high heat.",
+      "Season with salt and pepper, then serve.",
+    ],
+  });
+
+  // 2) Fridge + add-ons
+  recipes.push({
+    emoji: "🍲",
+    name: "Hearty Veggie Soup",
+    fridgeIngredients: pick(2),
+    needToBuy: ["Broth", "Potato"],
+    instructions: [
+      "Chop all vegetables.",
+      "Add broth and bring to a boil.",
+      "Simmer 20 minutes and serve hot.",
+    ],
+  });
+
+  // 3) Fridge + add-ons
+  recipes.push({
+    emoji: "🥗",
+    name: "Fresh Garden Salad",
+    fridgeIngredients: pick(2),
+    needToBuy: ["Lettuce", "Dressing"],
+    instructions: [
+      "Wash and slice the vegetables.",
+      "Toss everything in a bowl.",
+      "Drizzle with dressing and enjoy.",
+    ],
+  });
+
+  return recipes;
+}

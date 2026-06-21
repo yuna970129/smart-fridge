@@ -1,5 +1,5 @@
 import type { Ingredient, IngredientStatus, ScannedItem } from "./types";
-import type { FreshIngredient } from "./freshness";
+import type { FreshIngredient, Freshness } from "./freshness";
 
 async function jsonOrThrow(res: Response) {
   const data = await res.json().catch(() => ({}));
@@ -79,4 +79,34 @@ export async function seedFridge(): Promise<FreshIngredient[]> {
     await fetch("/api/seed", { method: "POST" }),
   );
   return data.ingredients ?? [];
+}
+
+
+
+export interface RecipeFridgeItem {
+  id: string;
+  name: string;
+  emoji: string;
+  freshness: Freshness;
+  days_left: number;
+}
+
+export interface Recipe {
+  emoji: string;
+  name: string;
+  fridgeIngredients: RecipeFridgeItem[];
+  needToBuy: string[];
+  instructions: string[];
+  usesOnlyFridge: boolean;
+}
+
+export async function getRecipes(): Promise<{
+  recipes: Recipe[];
+  mock: boolean;
+  empty?: boolean;
+}> {
+  const data = await jsonOrThrow(
+    await fetch("/api/recipes", { cache: "no-store" }),
+  );
+  return { recipes: data.recipes ?? [], mock: data.mock, empty: data.empty };
 }
