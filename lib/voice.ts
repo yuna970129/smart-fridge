@@ -132,6 +132,10 @@ export interface VoiceCommandResult {
     name: string;
     emoji: string;
     shelf_life_days?: number;
+    expires_at?: string;
+    days_left?: number;
+    freshness?: import("./freshness").Freshness;
+    adjusted?: boolean;
   }>;
   mock: boolean;
 }

@@ -234,16 +234,22 @@ export async function parseVoiceCommand(
   const response = await withRetry(() =>
     model.generateContent(
       `You are a fridge assistant. Read the user's spoken sentence and decide ONE action:
-- Bought / got groceries -> action "add": list the purchased food items.
-- Cooked / used food      -> action "consume": give the dish + the ingredients used,
+- Bought / got / have groceries -> action "add": list the food items.
+- Cooked / used food            -> action "consume": give the dish + the ingredients used,
   matched against the current fridge: ${JSON.stringify(fridgeItems)}.
 Return JSON:
 { "action": "add" | "consume",
   "dishName"?: string,
-  "items": [{ "emoji": string, "name": string }] }
+  "items": [{ "emoji": string, "name": string,
+              "expiresInDays"?: number, "boughtDaysAgo"?: number }] }
 Rules:
 - For "consume", "items" must ONLY contain names from the fridge list above.
 - For "add", include every grocery the user mentioned, with a fitting food emoji.
+- TIMING (only for "add"): if the user says when an item expires or was bought,
+  capture it as a NUMBER OF DAYS:
+    * "expires in 2 weeks" / "good for 5 days"  -> "expiresInDays": 14 / 5
+    * "bought 3 days ago" / "got it last week"  -> "boughtDaysAgo": 3 / 7
+  (1 week = 7 days. Omit the fields when no timing is mentioned.)
 - Names in English Title Case. The transcript may be Korean or English.
 
 User said: "${transcript}"`,
@@ -257,12 +263,44 @@ User said: "${transcript}"`,
   }>(response.response.text());
 
   const action: VoiceAction = raw?.action === "add" ? "add" : "consume";
-  const items = normalizeItems(raw?.items);
+  const items = normalizeVoiceItems(raw?.items);
   return {
     action,
     dishName: raw?.dishName ? String(raw.dishName).trim() : undefined,
     items,
   };
+}
+
+/** Like normalizeItems but also carries optional onboarding timing fields. */
+function normalizeVoiceItems(raw: unknown): ScannedItem[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: ScannedItem[] = [];
+  for (const entry of raw) {
+    const name =
+      typeof entry === "string"
+        ? entry
+        : String((entry as { name?: unknown })?.name ?? "").trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const obj = (typeof entry === "object" && entry ? entry : {}) as {
+      emoji?: unknown;
+      expiresInDays?: unknown;
+      boughtDaysAgo?: unknown;
+    };
+    const emoji = String(obj.emoji ?? "").trim() || emojiFor(name);
+    const item: ScannedItem = { name, emoji, shelf_life_days: shelfLifeFor(name) };
+    const exp = Number(obj.expiresInDays);
+    const ago = Number(obj.boughtDaysAgo);
+    if (Number.isFinite(exp) && exp >= 0) item.expires_in_days = Math.round(exp);
+    else if (Number.isFinite(ago) && ago >= 0)
+      item.purchased_days_ago = Math.round(ago);
+    out.push(item);
+    if (out.length >= 40) break;
+  }
+  return out;
 }
 
 const ADD_HINTS = [
@@ -272,6 +310,32 @@ const ADD_HINTS = [
 const CONSUME_HINTS = [
   "made", "cooked", "ate", "used", "끓였", "만들", "구웠", "먹었", "볶았", "삶았",
 ];
+
+/** Convert a worded/numeric duration in a chunk to days (1 week = 7 days). */
+function wordedDays(numText: string, unit: string): number {
+  const small: Record<string, number> = {
+    a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+    couple: 2, few: 3, several: 3,
+  };
+  const n = /^\d+$/.test(numText) ? parseInt(numText, 10) : small[numText] ?? 1;
+  return /week/.test(unit) ? n * 7 : n;
+}
+
+/** Extract "expires in N (days|weeks)" / "N (days|weeks) ago" from a chunk. */
+function parseTiming(chunk: string): {
+  expiresInDays?: number;
+  boughtDaysAgo?: number;
+} {
+  const c = chunk.toLowerCase();
+  const num = "(\\d+|a|an|one|two|three|four|five|six|couple|few|several)";
+  const exp = new RegExp(`(?:expires?|good|lasts?)\\s+(?:in|for)\\s+${num}\\s*(day|days|week|weeks)`).exec(c);
+  if (exp) return { expiresInDays: wordedDays(exp[1], exp[2]) };
+  const ago = new RegExp(`${num}\\s*(day|days|week|weeks)\\s+ago`).exec(c);
+  if (ago) return { boughtDaysAgo: wordedDays(ago[1], ago[2]) };
+  if (/last week/.test(c)) return { boughtDaysAgo: 7 };
+  if (/yesterday/.test(c)) return { boughtDaysAgo: 1 };
+  return {};
+}
 
 /** Keyword heuristic so the voice flow works without a Gemini key. */
 function mockVoiceCommand(
@@ -284,26 +348,48 @@ function mockVoiceCommand(
     !CONSUME_HINTS.some((h) => t.includes(h));
 
   if (isAdd) {
-    // Pull capitalized-ish nouns out of the sentence as grocery names.
+    // Split into per-item chunks ("eggs, carrot that expires in 2 weeks, milk").
+    const chunks = transcript
+      .replace(/[.!?]/g, "")
+      .split(/,| and /i)
+      .map((c) => c.trim())
+      .filter(Boolean);
+
     const stop = new Set([
-      "i","bought","buy","got","have","some","a","an","the","and","of","with","from",
-      "mart","store","today","just","two","three","couple","few","there","is","also",
-      "my","fridge","in","there's","stocked","purchased",
+      "i","bought","buy","got","have","has","some","a","an","the","and","of",
+      "with","from","mart","store","today","just","two","three","couple","few",
+      "there","is","are","also","my","fridge","in","that","which","expires",
+      "expire","good","for","ago","week","weeks","day","days","last","there's",
+      "stocked","purchased","still","leftover","bit","piece","pieces",
     ]);
-    const words = transcript
-      .replace(/[.,!?]/g, " ")
-      .split(/\s+/)
-      .map((w) => w.trim())
-      .filter((w) => w && !stop.has(w.toLowerCase()) && !/^\d+$/.test(w));
+
     const seen = new Set<string>();
     const items: ScannedItem[] = [];
-    for (const w of words) {
-      const name = w[0].toUpperCase() + w.slice(1).toLowerCase();
+    for (const chunk of chunks) {
+      const timing = parseTiming(chunk);
+      const words = chunk
+        .split(/\s+/)
+        .map((w) => w.trim())
+        .filter((w) => w && !stop.has(w.toLowerCase()) && !/^\d+$/.test(w));
+      if (!words.length) continue;
+      // Use the remaining word(s) as the item name (last 1-2 nouns).
+      const nameWords = words.slice(-2);
+      const name = nameWords
+        .map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
       const key = name.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      items.push({ name, emoji: emojiFor(name) });
-      if (items.length >= 12) break;
+      const item: ScannedItem = {
+        name,
+        emoji: emojiFor(name),
+        shelf_life_days: shelfLifeFor(name),
+      };
+      if (timing.expiresInDays != null) item.expires_in_days = timing.expiresInDays;
+      else if (timing.boughtDaysAgo != null)
+        item.purchased_days_ago = timing.boughtDaysAgo;
+      items.push(item);
+      if (items.length >= 15) break;
     }
     return { action: "add", items };
   }

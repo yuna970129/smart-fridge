@@ -6,12 +6,6 @@ export const dynamic = "force-dynamic";
 
 const actions = [
   {
-    href: "/voice",
-    emoji: "🎙️",
-    title: "Voice Command",
-    desc: "Speak to add, use up, or first-time stock your fridge",
-  },
-  {
     href: "/scan-receipt",
     emoji: "📸",
     title: "Scan Receipt",
@@ -22,6 +16,12 @@ const actions = [
     emoji: "🍽️",
     title: "Check Dish",
     desc: "Update your fridge after cooking",
+  },
+  {
+    href: "/voice",
+    emoji: "🎙️",
+    title: "Voice Command",
+    desc: "Add or remove items by voice",
   },
   {
     href: "/fridge",
@@ -57,6 +57,19 @@ export default async function Home() {
         </h1>
         <p className="mt-2 text-ink-soft">Your smart kitchen companion</p>
       </div>
+
+      <Link
+        href="/voice?setup=1"
+        className="animate-fade-up mb-4 flex items-center gap-3 rounded-2xl bg-gold/30 px-4 py-3 shadow-soft backdrop-blur-sm transition duration-300 hover:-translate-y-0.5 hover:bg-gold/45"
+      >
+        <span className="text-xl">👋</span>
+        <span className="flex flex-col">
+          <span className="text-[15px] font-semibold text-ink">
+            New here? Tell us what you have
+          </span>
+          <span className="text-[13px] text-ink-soft">(tap to record)</span>
+        </span>
+      </Link>
 
       {attention > 0 && (
         <Link

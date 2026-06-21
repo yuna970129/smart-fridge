@@ -3,13 +3,20 @@ import { parseVoiceCommand, usingMockAI, describeAiError } from "@/lib/gemini";
 import { getStore } from "@/lib/store";
 import { shelfLifeFor } from "@/lib/shelflife";
 import { emojiFor } from "@/lib/emoji";
+import { daysLeft, freshnessLevel, toISODate } from "@/lib/freshness";
 import type { Ingredient } from "@/lib/types";
 
 export const runtime = "nodejs";
 
+function addDaysISO(from: Date, days: number): string {
+  const d = new Date(from);
+  d.setDate(d.getDate() + days);
+  return toISODate(d);
+}
+
 // POST /api/voice/command  { transcript }
 // → { action: "add" | "consume", dishName?, items }
-//   - add:     items = [{ name, emoji, shelf_life_days }]  (not yet saved)
+//   - add:     items = [{ name, emoji, shelf_life_days, expires_at, days_left, freshness, adjusted }]
 //   - consume: items = matched fridge rows (with ids) to mark gone
 export async function POST(req: NextRequest) {
   try {
@@ -28,14 +35,36 @@ export async function POST(req: NextRequest) {
     );
 
     if (cmd.action === "add") {
-      // Attach emoji + category shelf life so the confirm list can show (Avg Xd).
+      const now = new Date();
+      // Resolve expiry, accounting for spoken timing (onboarding):
+      //   explicit "expires in N" > "bought N ago" (avg − N) > plain average.
       const items = cmd.items
         .filter((i) => i.name?.trim())
-        .map((i) => ({
-          name: i.name.trim(),
-          emoji: i.emoji?.trim() || emojiFor(i.name),
-          shelf_life_days: shelfLifeFor(i.name),
-        }));
+        .map((i) => {
+          const name = i.name.trim();
+          const shelf = shelfLifeFor(name);
+          let expires_at: string;
+          let adjusted = false;
+          if (typeof i.expires_in_days === "number") {
+            expires_at = addDaysISO(now, i.expires_in_days);
+            adjusted = true;
+          } else if (typeof i.purchased_days_ago === "number") {
+            expires_at = addDaysISO(now, shelf - i.purchased_days_ago);
+            adjusted = true;
+          } else {
+            expires_at = addDaysISO(now, shelf);
+          }
+          const dl = daysLeft(expires_at, now);
+          return {
+            name,
+            emoji: i.emoji?.trim() || emojiFor(name),
+            shelf_life_days: shelf,
+            expires_at,
+            days_left: dl,
+            freshness: freshnessLevel(dl),
+            adjusted,
+          };
+        });
       return NextResponse.json({
         action: "add",
         items,

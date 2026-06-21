@@ -20,6 +20,16 @@ export interface ScannedItem {
   shelf_life_days?: number;
   /** Optional explicit expiry override (used by the demo seed). */
   expires_at?: string;
+  /**
+   * Voice onboarding: how many days ago the item was bought. The remaining
+   * shelf life is reduced accordingly (e.g. bought 3 days ago → avg − 3 days).
+   */
+  purchased_days_ago?: number;
+  /**
+   * Voice onboarding: explicit remaining days until expiry, when the user
+   * states it directly (e.g. "carrot that expires in 2 weeks" → 14).
+   */
+  expires_in_days?: number;
 }
 
 /** Result of analyzing a cooked dish photo. */

@@ -34,7 +34,19 @@ function resolveExpiry(
   now: Date,
 ): { shelf_life_days: number; expires_at: string } {
   const shelf_life_days = item.shelf_life_days ?? shelfLifeFor(item.name);
-  const expires_at = item.expires_at ?? addDaysISO(now, shelf_life_days);
+
+  // Precedence: explicit expires_at > explicit remaining days > purchase-time
+  // adjustment (avg − days since bought) > plain category average.
+  let expires_at: string;
+  if (item.expires_at) {
+    expires_at = item.expires_at;
+  } else if (typeof item.expires_in_days === "number") {
+    expires_at = addDaysISO(now, item.expires_in_days);
+  } else if (typeof item.purchased_days_ago === "number") {
+    expires_at = addDaysISO(now, shelf_life_days - item.purchased_days_ago);
+  } else {
+    expires_at = addDaysISO(now, shelf_life_days);
+  }
   return { shelf_life_days, expires_at };
 }
 

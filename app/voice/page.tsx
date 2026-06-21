@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Screen } from "@/components/Screen";
 import { Button } from "@/components/Button";
@@ -18,10 +19,29 @@ import {
 import { cn } from "@/lib/cn";
 
 type Step = "idle" | "listening" | "thinking" | "add" | "consume" | "done";
-type AddRow = { name: string; emoji: string; shelf_life_days?: number; checked: boolean };
+type AddRow = {
+  name: string;
+  emoji: string;
+  shelf_life_days?: number;
+  expires_at?: string;
+  days_left?: number;
+  adjusted?: boolean;
+  checked: boolean;
+};
 type UseRow = { id: string; name: string; emoji: string; used: boolean };
 
 export default function VoicePage() {
+  return (
+    <Suspense fallback={null}>
+      <VoicePageInner />
+    </Suspense>
+  );
+}
+
+function VoicePageInner() {
+  const searchParams = useSearchParams();
+  const isSetup = searchParams.get("setup") === "1";
+
   const [step, setStep] = useState<Step>("idle");
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
@@ -37,13 +57,14 @@ export default function VoicePage() {
     verb: "",
     names: [],
   });
-  const [onboarding, setOnboarding] = useState(false);
+  const [onboarding, setOnboarding] = useState(isSetup);
 
   const recorderRef = useRef<MicRecorder | null>(null);
 
-  // First-launch onboarding: if the fridge is empty, nudge the user to stock it
-  // by speaking a long inventory ("I have eggs, milk, carrots, kimchi…").
+  // Onboarding framing ("welcome onboard, tell us what you have") shows when
+  // launched from the Home CTA (?setup=1) OR when the fridge is empty.
   useEffect(() => {
+    if (isSetup) return; // already onboarding from the query param
     let active = true;
     (async () => {
       try {
@@ -56,7 +77,7 @@ export default function VoicePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isSetup]);
 
   async function startVoice() {
     setError(null);
@@ -155,7 +176,14 @@ export default function VoicePage() {
     const picked = addRows.filter((r) => r.checked);
     setStep("thinking");
     try {
-      await addToFridge(picked.map(({ name, emoji }) => ({ name, emoji })));
+      await addToFridge(
+        picked.map(({ name, emoji, expires_at, shelf_life_days }) => ({
+          name,
+          emoji,
+          expires_at,
+          shelf_life_days,
+        })),
+      );
       setDoneMsg({ verb: "Added to fridge", names: picked.map((r) => r.name) });
       setStep("done");
     } catch (e) {
@@ -188,7 +216,10 @@ export default function VoicePage() {
   }
 
   return (
-    <Screen backHref="/" title="🎙️ Voice Command">
+    <Screen
+      backHref="/"
+      title={onboarding ? "👋 Welcome onboard" : "🎙️ Voice Command"}
+    >
       {error && (
         <p className="mb-4 rounded-2xl bg-rose-50/80 px-4 py-3 text-sm text-rose-600 shadow-soft">
           {error}
@@ -200,16 +231,16 @@ export default function VoicePage() {
           {onboarding && (
             <div className="glass w-full rounded-3xl p-5 text-left shadow-soft">
               <p className="text-base font-semibold text-ink">
-                👋 Welcome! Let&apos;s stock your fridge
+                👋 Welcome onboard!
               </p>
               <p className="mt-1.5 text-sm text-ink-soft">
-                Your fridge is empty. Already have groceries at home? No need to
-                photograph each one — just tap the mic and{" "}
-                <b>list everything you have</b> in one go.
+                Please let me know what you already have. No need to photograph
+                each one — just tap the mic and <b>list everything in your
+                fridge</b> in one go. You can even say how fresh things are.
               </p>
               <p className="mt-2 rounded-xl bg-white/55 px-3 py-2 text-sm italic text-ink-soft">
-                “I have eggs, milk, carrots, butter, kimchi, garlic and some
-                green onions.”
+                “I have eggs, milk, a carrot that expires in 2 weeks, butter,
+                kimchi, and garlic I bought 3 days ago.”
               </p>
             </div>
           )}
@@ -217,8 +248,8 @@ export default function VoicePage() {
           <p className="text-[15px] text-ink-soft">
             {onboarding ? (
               <>
-                Say <b>everything in your fridge</b> — I&apos;ll add it all at
-                once.
+                Welcome onboard! Please let me know{" "}
+                <b>what you already have</b>.
               </>
             ) : (
               <>
@@ -237,7 +268,10 @@ export default function VoicePage() {
           </button>
           <div className="text-sm text-ink-soft">
             {onboarding ? (
-              <p>Take your time — list as many items as you like.</p>
+              <>
+                <p>e.g. &quot;I have milk, eggs and a carrot&quot;</p>
+                <p>or &quot;I bought apples that expire in a week&quot;</p>
+              </>
             ) : (
               <>
                 <p>e.g. &quot;I bought milk and apples&quot;</p>
@@ -328,10 +362,27 @@ export default function VoicePage() {
                   <span className="text-2xl leading-none">{row.emoji}</span>
                   <span className="flex-1 text-[17px] font-medium text-ink">
                     {row.name}
-                    {row.shelf_life_days != null && (
-                      <span className="ml-1.5 text-[14px] font-normal text-ink-soft">
-                        (Avg {row.shelf_life_days}d)
+                    {row.adjusted && row.days_left != null ? (
+                      <span
+                        className={cn(
+                          "ml-1.5 text-[14px] font-medium",
+                          row.days_left <= 0
+                            ? "text-rose-600"
+                            : row.days_left <= 3
+                              ? "text-amber-600"
+                              : "text-ink-soft",
+                        )}
+                      >
+                        {row.days_left <= 0
+                          ? "(expired)"
+                          : `(${row.days_left}d left)`}
                       </span>
+                    ) : (
+                      row.shelf_life_days != null && (
+                        <span className="ml-1.5 text-[14px] font-normal text-ink-soft">
+                          (Avg {row.shelf_life_days}d)
+                        </span>
+                      )
                     )}
                   </span>
                 </button>
